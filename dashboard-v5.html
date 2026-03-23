@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Printer Dashboard</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #111;
+            color: #eee;
+            padding: 20px;
+        }
+
+        h2 {
+            margin-top: 30px;
+        }
+
+        .grid {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            background: #222;
+            padding: 12px;
+            margin: 6px;
+            border-radius: 10px;
+            min-width: 160px;
+        }
+
+        .value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .sub {
+            font-size: 12px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+
+<h1>3D Printer Dashboard</h1>
+
+<!-- STATUS -->
+<h2>Status</h2>
+<div class="grid">
+    <div class="card">State: <span id="state" class="value">-</span></div>
+    <div class="card">Progress: <span id="progress" class="value">-</span>%</div>
+    <div class="card">File: <span id="file" class="value">-</span></div>
+</div>
+
+<!-- TEMPERATURE -->
+<h2>Temperature</h2>
+<div class="grid">
+    <div class="card">
+        Nozzle:
+        <div class="value">
+            <span id="nozzle_actual">-</span> /
+            <span id="nozzle_target">-</span> °C
+        </div>
+    </div>
+
+    <div class="card">
+        Bed:
+        <div class="value">
+            <span id="bed_actual">-</span> /
+            <span id="bed_target">-</span> °C
+        </div>
+    </div>
+</div>
+
+<!-- MOTION -->
+<h2>Motion</h2>
+<div class="grid">
+    <div class="card">X: <span id="x" class="value">-</span></div>
+    <div class="card">Y: <span id="y" class="value">-</span></div>
+    <div class="card">Z: <span id="z" class="value">-</span></div>
+
+    <div class="card">
+        Extrusion (Total)
+        <div class="value" id="e_total">-</div>
+        <div class="sub">ΔE: <span id="e_delta">-</span></div>
+    </div>
+
+    <div class="card">Feedrate: <span id="f" class="value">-</span></div>
+</div>
+
+<script>
+// ==========================
+// MQTT
+// ==========================
+const client = mqtt.connect('ws://localhost:9001');
+
+client.on('connect', () => {
+    console.log('CONNECTED');
+    client.subscribe('octoPrint/#');
+});
+
+// ==========================
+// STATE
+// ==========================
+let lastE = null;
+
+// ==========================
+// SAFE FORMAT
+// ==========================
+function safe(val, digits = 2) {
+    return (val !== null && val !== undefined)
+        ? Number(val).toFixed(digits)
+        : "-";
+}
+
+// ==========================
+// MESSAGE HANDLER
+// ==========================
+client.on('message', (topic, message) => {
+
+    let data;
+    try {
+        data = JSON.parse(message.toString());
+    } catch {
+        return;
+    }
+
+    // ======================
+    // TEMPERATURE
+    // ======================
+    if (topic === 'octoPrint/temperature/tool0') {
+        document.getElementById('nozzle_actual').innerText = safe(data.actual);
+        document.getElementById('nozzle_target').innerText = safe(data.target);
+    }
+
+    if (topic === 'octoPrint/temperature/bed') {
+        document.getElementById('bed_actual').innerText = safe(data.actual);
+        document.getElementById('bed_target').innerText = safe(data.target);
+    }
+
+    // ======================
+    // PROGRESS
+    // ======================
+    if (topic === 'octoPrint/progress/printing') {
+        document.getElementById('progress').innerText = safe(data.progress, 1);
+        document.getElementById('file').innerText = data.path || "-";
+    }
+
+    // ======================
+    // STATE
+    // ======================
+    if (topic === 'octoPrint/event/PrinterStateChanged') {
+        document.getElementById('state').innerText = data.state_string;
+    }
+
+    // ======================
+    // MOTION
+    // ======================
+    if (topic === 'octoPrint/motion') {
+
+        document.getElementById('x').innerText = safe(data.x);
+        document.getElementById('y').innerText = safe(data.y);
+        document.getElementById('z').innerText = safe(data.z);
+        document.getElementById('f').innerText = safe(data.f, 0);
+
+        // TOTAL E
+        document.getElementById('e_total').innerText = safe(data.e, 3);
+
+        if (lastE !== null) {
+            let delta = data.e - lastE;
+
+            // 🚫 FILTER RESET SPIKES
+            if (Math.abs(delta) > 20) {
+                delta = 0;
+            }
+
+            document.getElementById('e_delta').innerText = safe(delta, 3);
+
+            // 🎨 COLOR
+            const eElem = document.getElementById('e_total');
+
+            if (delta > 0) {
+                eElem.style.color = "lime";
+            } else if (delta < 0) {
+                eElem.style.color = "red";
+            } else {
+                eElem.style.color = "white";
+            }
+        }
+
+        lastE = data.e;
+    }
+
+});
+</script>
+
+</body>
+</html>
