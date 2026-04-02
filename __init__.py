@@ -9,9 +9,17 @@ class MotionMqttPlugin(
 
     def on_after_startup(self):
         self._logger.info("Motion MQTT Plugin started")
-        self.last = {"x": 0, "y": 0, "z": 0, "e": 0, "f": 0}
+        self.last = {"x": 0, "y": 0, "z": 0, "e": 0, "f": 0, "cmdIndex": 0}
+        self.cmd_index = 0
 
     def gcode_sent(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+        # We only count motion commands to match the Digital Shadow's parsed move list
+        # We must count the EXACT same commands as GCodeLoader.js to keep pointers in sync
+        # Indexable commands: G0, G1, G2, G3, G4, G28, G92
+        if cmd.startswith(("G0", "G1", "G2", "G3", "G4", "G28", "G92")):
+            self.cmd_index += 1
+            self.last["cmdIndex"] = self.cmd_index
+            self.last["is_extruding"] = ("E" in cmd and (cmd.startswith("G1") or "X" in cmd or "Y" in cmd))
 
         # ==========================
         # HANDLE EXTRUSION RESET (G92 E...)

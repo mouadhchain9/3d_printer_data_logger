@@ -1,0 +1,62 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <title>MQTT Test</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+
+<h2>Check console</h2>
+
+<script>
+const client = mqtt.connect('ws://localhost:9001');
+
+client.on('connect', () => console.log('CONNECTED'));
+client.on('error', err => console.log('ERROR', err));
+
+client.subscribe('octoPrint/#');
+
+client.on('message', (topic, message) => {
+    console.log(topic, message.toString());
+});
+client.subscribe('octoPrint/motion');
+
+client.on('message', (topic, message) => {
+    console.log(topic, message.toString());
+});
+
+
+</script>
+
+</body>
+</html>
+    mosquitto -c "C:\Program Files\mosquitto\mosquitto.conf" -v 
+ -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MQTT Test</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+
+<h2>Check console</h2>
+
+<script>
+const client = mqtt.connect('ws://localhost:9001');
+
+client.on('connect', () => {
+    console.log('CONNECTED');
+    client.subscribe('octoPrint/motion'); // match plugin topic
+});
+
+client.on('error', err => console.log('ERROR', err));
+
+client.on('message', (topic, message) => {
+    console.log("RECEIVED:", topic, message.toString());
+});
+</script>
+
+</body>
+</html>
